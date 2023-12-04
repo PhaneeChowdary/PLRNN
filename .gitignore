@@ -1,0 +1,15 @@
+*~
+*.json
+mean_im_de_trj/
+results/
+Materials/
+.vscode/
+.ipynb_checkpoints
+__pycache__
+Reference.ipynb
+rough.py
+trajectoryGPT.pdf
+gpt.py
+get_spiketrains.py
+initial_individual.py
+rnnflax.py

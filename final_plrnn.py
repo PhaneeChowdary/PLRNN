@@ -1,12 +1,13 @@
 import jax
 import optax
 import numpy as np
+from typing import Any
 from jax import random
 import jax.numpy as jnp
-from typing import Any
 from scipy import integrate
-from flax.linen import RNNCellBase, compact
 from flax.linen.linear import Dense
+from matplotlib import pyplot as plt
+from flax.linen import RNNCellBase, compact
 
 
 def rossler(u, t, p):
@@ -107,53 +108,86 @@ def reset_W_diagonal(params):
     return params
 
 
-time_steps = 200
-obs = get_data(np.linspace(0, 10, time_steps))
-obs = jnp.array(obs)
+# Main block execution
+if __name__ == '__main__':
+    D = 15
+    N = 3
 
-rng = jax.random.PRNGKey(0)
-s = jnp.ones((1, time_steps, 1))
+    # Generate data
+    time = 123
+    time_steps = 200
+    obs = get_data(np.linspace(0, time, time*10))
+    obs = jnp.array(obs)[-time_steps:, :N][None, :]
 
-D = 15
-N = 3
-# Initialize the model
-n1 = basicPLRNNCell(D=D, N=N)
+    rng = jax.random.PRNGKey(1234)
+    s = jnp.zeros((1, time_steps, 1))
 
-# Initialize the carry (latent state), parameters
-carry = n1.initialize_carry(rng)
-params = n1.init(rng, carry, s)
+    # Initialize the model
+    n1 = basicPLRNNCell(D=D, N=N)
 
-# Set up the optimizer
-optimizer = optax.chain(optax.adamw(learning_rate=1e-3))
-opt_state = optimizer.init(params)
+    # Initialize the carry (latent state), parameters
+    carry = n1.initialize_carry(rng)
+    params = n1.init(rng, carry, s)
 
-# Training loop
-for epoch in range(10):
-    loss, grads = jax.value_and_grad(compute_loss_)(params, carry, s, obs)
-    updates, opt_state = optimizer.update(grads, opt_state, params)
-    params = optax.apply_updates(params, updates)
+    # Set up the optimizer
+    optimizer = optax.chain(optax.adamw(learning_rate=1e-3))
+    opt_state = optimizer.init(params)
 
-    # Reset the diagonal elements of W to zero
-    params = reset_W_diagonal(params)
+    # Training loop
+    for epoch in range(10):
+        loss, grads = jax.value_and_grad(compute_loss_)(params, carry, s, obs)
+        updates, opt_state = optimizer.update(grads, opt_state, params)
+        params = optax.apply_updates(params, updates)
 
-    print(f"Epoch {epoch}, Loss: {loss}")
+        # Reset the diagonal elements of W to zero
+        params = reset_W_diagonal(params)
+        # print(f"Epoch {epoch}, Loss: {loss}")
 
-xi = n1.apply(params, carry, s)
+    xi = n1.apply(params, carry, s)
 
-for _ in range(1000):
-    loss, grads = jax.value_and_grad(compute_loss_)(params, carry, s, obs)
-    updates, opt_state = optimizer.update(grads, opt_state, params)
-    params = optax.apply_updates(params, updates)
+    for epoch in range(1000):
+        loss, grads = jax.value_and_grad(compute_loss_)(params, carry, s, obs)
+        updates, opt_state = optimizer.update(grads, opt_state, params)
+        params = optax.apply_updates(params, updates)
 
-    # Reset the diagonal elements of W to zero
-    params = reset_W_diagonal(params)
+        # Reset the diagonal elements of W to zero
+        params = reset_W_diagonal(params)
 
-xe = n1.apply(params, carry, s)
+    xe = n1.apply(params, carry, s)
 
+    # print(params['params']['B']['kernel'])
+    # print(params['params']['A']['kernel'])
+    # print(params['params']['W']['kernel'])
 
-# print(params['params']['B']['kernel'])
-# print(params['params']['A']['kernel'])
-print(params['params']['W']['kernel'])
+    # q=jax.tree_util.tree_map(lambda x: x.shape, params)
+    # print(q['params'])
 
-# q=jax.tree_util.tree_map(lambda x: x.shape, params)
-# print(q['params'])
+    # Inspect the shape and type of xe
+    print("Type of xe:", type(xe))
+    if isinstance(xe, tuple):
+        print("Length of tuple:", len(xe))
+        for i, item in enumerate(xe):
+            print(f"Shape of item {i} in tuple:", item.shape)
+    elif isinstance(xe, jnp.ndarray):
+        print("Shape of xe as ndarray:", xe.shape)
+    else:
+        print("xe is neither a tuple nor an ndarray")
+
+    # Plot the xe and obs
+    xe = np.array(xe[1][0])
+    obs = np.array(obs)[0]
+
+    ax1 = plt.subplot(311)
+    ax1.plot(obs[:, 0], color='C0')
+    ax1.plot(xe[:, 0], color='C1')
+
+    ax2 = plt.subplot(312)
+    ax2.plot(obs[:, 1], color='C0')
+    ax2.plot(xe[:, 1], '--', color='C1')
+
+    ax3 = plt.subplot(313)
+    ax3.plot(obs[:, 2], color='C0')
+    ax3.plot(xe[:, 2], '--', color='C1')
+
+    plt.savefig('FinalTrajectory.pdf')
+    plt.close()
