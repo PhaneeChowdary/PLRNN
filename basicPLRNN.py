@@ -52,13 +52,14 @@ class basicPLRNNCell(RNNCellBase):
     D: int  # Number of variables in latent space
     N: int  # Number of observed neuronal firing rates
     dtype: Any = jnp.float32
+    rng = jax.random.PRNGKey(1234)
+    R = random.normal(rng, (15, 15))
 
     # Create matrix A (Diagonal Matrix)
     def init_A(self, key, shape, dtype):
         D = shape[0]
         scale = 10
-        R = random.normal(key, (D, D))
-        q = (R.T@R/D + scale*jnp.eye(D))
+        q = (self.R.T@self.R/D + scale*jnp.eye(D))
         w, v = jnp.linalg.eigh(q)
         H = q / jnp.max(w.real)
         A = jnp.diag(H)
@@ -68,8 +69,7 @@ class basicPLRNNCell(RNNCellBase):
     def init_W(self, key, shape, dtype):
         D = shape[0]
         scale = 10
-        R = random.normal(key, (D, D))
-        q = (R.T@R/D + scale*jnp.eye(D))
+        q = (self.R.T@self.R/D + scale*jnp.eye(D))
         w, v = jnp.linalg.eigh(q)
         H = q / jnp.max(w.real)
         A = jnp.diag(H)
@@ -87,7 +87,7 @@ class basicPLRNNCell(RNNCellBase):
                        kernel_init=self.init_W)
 
         # C Matrix
-        self.C = Dense(self.D, use_bias=False, dtype=self.dtype)
+        # self.C = Dense(self.D, use_bias=False, dtype=self.dtype)
 
         # B Matrix
         self.B = Dense(self.N, use_bias=False, dtype=self.dtype)
@@ -105,10 +105,10 @@ class basicPLRNNCell(RNNCellBase):
         W_z = self.W(jnp.maximum(0, z_prev))
 
         # C*s_t
-        C_s = self.C(s_t)
+        # C_s = self.C(s_t)
 
         # Latent Model z_t
-        z_t = A_z + W_z + C_s
+        z_t = A_z + W_z + s_t*z_prev
 
         # Observation Model x_t
         x_t = self.B(z_t)
@@ -187,9 +187,10 @@ if __name__ == '__main__':
 
     xe = n1.apply(params, carry, s)
 
-    # print(params['params']['B']['kernel'])
-    # print(params['params']['A']['kernel'])
-    # print(params['params']['W']['kernel'])
+    # print("B Matrix: ", params['params']['B']['kernel'])
+    # print("A Matrix: ", params['params']['A']['kernel'])
+    # print("W Matrix: ", params['params']['W']['kernel'])
+    # print("C Matrix: ", params['params']['C']['kernel'])
 
     # q = jax.tree_util.tree_map(lambda x: x.shape, params)
     # print(q['params'])
