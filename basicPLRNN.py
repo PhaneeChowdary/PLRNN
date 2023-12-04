@@ -172,17 +172,6 @@ if __name__ == '__main__':
     # q = jax.tree_util.tree_map(lambda x: x.shape, params)
     # print(q['params'])
 
-    # Inspect the shape and type of xe
-    # print("Type of xe:", type(xe))
-    # if isinstance(xe, tuple):
-    #     print("Length of tuple:", len(xe))
-    #     for i, item in enumerate(xe):
-    #         print(f"Shape of item {i} in tuple:", item.shape)
-    # elif isinstance(xe, jnp.ndarray):
-    #     print("Shape of xe as ndarray:", xe.shape)
-    # else:
-    #     print("xe is neither a tuple nor an ndarray")
-
     # Plot the xe and obs
     xe = np.array(xe[1][0])
     obs = np.array(obs)[0]
