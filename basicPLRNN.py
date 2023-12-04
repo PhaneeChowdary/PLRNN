@@ -28,16 +28,20 @@ def get_data(tt, a=0.2, b=0.2, c=5.7, u0=good_u0):
     return sol
 
 
+def init_AW(key, D, scale=10):
+    R = random.normal(key, (D, D))
+    q = (R.T@R/D + scale*jnp.eye(D))
+    w, v = jnp.linalg.eigh(q)
+    H = q / jnp.max(w.real)
+    A = jnp.diag(H)
+    W = H - A*jnp.eye(D)
+    return A, W
+
+
 class basicPLRNNCell(RNNCellBase):
     D: int  # Number of variables in latent space
     N: int  # Number of observed neuronal firing rates
     dtype: Any = jnp.float32
-
-    def diag_init(self, key, shape, dtype=jnp.float32):
-        # Initialize a diagonal matrix
-        assert shape[0] == shape[1]
-        diag = jax.random.normal(key, (shape[0],))
-        return jnp.diag(diag)
 
     def off_diag_init(self, key, shape, dtype=jnp.float32):
         # Initialize an off-diagonal matrix
@@ -98,13 +102,13 @@ def compute_loss_(params, carry, s, obs):
 
 
 def reset_W_diagonal(params):
-    W_matrix = params['params']['W']['kernel']
+    W = params['params']['W']['kernel']
 
     # Set the diagonal elements to zero
-    W_matrix = W_matrix.at[jnp.diag_indices(W_matrix.shape[0])].set(0)
+    W = W.at[jnp.diag_indices(W.shape[0])].set(0)
 
     # Update the parameters dictionary
-    params['params']['W']['kernel'] = W_matrix
+    params['params']['W']['kernel'] = W
     return params
 
 
@@ -163,15 +167,15 @@ if __name__ == '__main__':
     # print(q['params'])
 
     # Inspect the shape and type of xe
-    print("Type of xe:", type(xe))
-    if isinstance(xe, tuple):
-        print("Length of tuple:", len(xe))
-        for i, item in enumerate(xe):
-            print(f"Shape of item {i} in tuple:", item.shape)
-    elif isinstance(xe, jnp.ndarray):
-        print("Shape of xe as ndarray:", xe.shape)
-    else:
-        print("xe is neither a tuple nor an ndarray")
+    # print("Type of xe:", type(xe))
+    # if isinstance(xe, tuple):
+    #     print("Length of tuple:", len(xe))
+    #     for i, item in enumerate(xe):
+    #         print(f"Shape of item {i} in tuple:", item.shape)
+    # elif isinstance(xe, jnp.ndarray):
+    #     print("Shape of xe as ndarray:", xe.shape)
+    # else:
+    #     print("xe is neither a tuple nor an ndarray")
 
     # Plot the xe and obs
     xe = np.array(xe[1][0])
