@@ -177,17 +177,11 @@ if __name__ == '__main__':
     xe = np.array(xe[1][0])
     obs = np.array(obs)[0]
 
-    ax1 = plt.subplot(311)
-    ax1.plot(obs[:, 0], color='C0')
-    ax1.plot(xe[:, 0], color='C1')
-
-    ax2 = plt.subplot(312)
-    ax2.plot(obs[:, 1], color='C0')
-    ax2.plot(xe[:, 1], '--', color='C1')
-
-    ax3 = plt.subplot(313)
-    ax3.plot(obs[:, 2], color='C0')
-    ax3.plot(xe[:, 2], '--', color='C1')
-
+    plt.figure(figsize=(12, 8))
+    for i in range(3):
+        plt.subplot(3, 1, i + 1)
+        plt.plot(obs[:, i], color='C0')
+        plt.plot(xe[:, i], '--', color='C1')
+    plt.tight_layout()
     plt.savefig('FinalTrajectory.pdf')
     plt.close()
