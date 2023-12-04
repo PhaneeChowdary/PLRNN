@@ -28,34 +28,40 @@ def get_data(tt, a=0.2, b=0.2, c=5.7, u0=good_u0):
     return sol
 
 
-def init_AW(key, D, scale=10):
-    R = random.normal(key, (D, D))
-    q = (R.T@R/D + scale*jnp.eye(D))
-    w, v = jnp.linalg.eigh(q)
-    H = q / jnp.max(w.real)
-    A = jnp.diag(H)
-    W = H - A*jnp.eye(D)
-    return A, W
-
-
 class basicPLRNNCell(RNNCellBase):
     D: int  # Number of variables in latent space
     N: int  # Number of observed neuronal firing rates
     dtype: Any = jnp.float32
 
-    def off_diag_init(self, key, shape, dtype=jnp.float32):
-        # Initialize an off-diagonal matrix
-        assert shape[0] == shape[1]
-        mat = jax.random.normal(key, shape)
-        return mat * (1 - jnp.eye(shape[0]))
+    def init_A(self, key, shape, dtype):
+        D = shape[0]
+        scale = 10
+        R = random.normal(key, (D, D))
+        q = (R.T@R/D + scale*jnp.eye(D))
+        w, v = jnp.linalg.eigh(q)
+        H = q / jnp.max(w.real)
+        A = jnp.diag(H)
+        return A
+
+    def init_W(self, key, shape, dtype):
+        D = shape[0]
+        scale = 10
+        R = random.normal(key, (D, D))
+        q = (R.T@R/D + scale*jnp.eye(D))
+        w, v = jnp.linalg.eigh(q)
+        H = q / jnp.max(w.real)
+        A = jnp.diag(H)
+        W = H - A*jnp.eye(D)
+        return W
 
     def setup(self):
         # Diagonal matrix A
-        self.A = Dense(1, use_bias=False, dtype=self.dtype)
+        self.A = Dense(1, use_bias=False, dtype=self.dtype,
+                       kernel_init=self.init_A)
 
         # W - Off-diagonal matrix + h (bias)
         self.W = Dense(self.D, use_bias=True, dtype=self.dtype,
-                       kernel_init=self.off_diag_init)
+                       kernel_init=self.init_W)
 
         # C Matrix
         self.C = Dense(self.D, use_bias=False, dtype=self.dtype)
@@ -163,7 +169,7 @@ if __name__ == '__main__':
     # print(params['params']['A']['kernel'])
     # print(params['params']['W']['kernel'])
 
-    # q=jax.tree_util.tree_map(lambda x: x.shape, params)
+    # q = jax.tree_util.tree_map(lambda x: x.shape, params)
     # print(q['params'])
 
     # Inspect the shape and type of xe
