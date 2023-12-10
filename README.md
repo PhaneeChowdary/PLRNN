@@ -1,1 +1,1 @@
-# Building a PLRNN from scratch
+# Building a PLRNNCell from scratch
