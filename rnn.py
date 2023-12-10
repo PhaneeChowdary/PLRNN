@@ -7,7 +7,7 @@ from jax import numpy as jnp
 from flax import linen as nn
 from functools import partial
 from matplotlib import pyplot as plt
-from basicPLRNN import basicPLRNNCell
+from basicPLRNN_Mod import basicPLRNNCell
 
 
 # Rossler dynamical system, used for generating synthetic data.
@@ -80,7 +80,6 @@ if __name__ == '__main__':
     # Initialize carry
     plrnn_cell = basicPLRNNCell(dz, my_dims)
     carry = plrnn_cell.initialize_carry(random.PRNGKey(1234))
-    print("Carry shape: ", carry.shape)
 
     # Initialize model parameters
     key, skey = random.split(random.PRNGKey(1234), 2)
@@ -93,8 +92,6 @@ if __name__ == '__main__':
     optimizer = optax.adamw(learning_rate=1e-3)
     opt_state = optimizer.init(params)
 
-    print("Carry before training: ", carry)
-
     # Training loop
     for epoch in range(10):
         # print("Epoch: ", epoch)
@@ -106,7 +103,6 @@ if __name__ == '__main__':
 
     carry, predicted = model.apply(params, carry, s)
     carry = carry[0][0]
-    print("\nCarry after 10 epochs training: ", carry)  # print carry
 
     # Further training
     for epoch in range(1000):
@@ -118,20 +114,17 @@ if __name__ == '__main__':
         params = reset_W_diagonal(params)
 
     carry, xe = model.apply(params, carry, s)
-    carry = carry[0][0]
 
-    print("Carry after 1000 epochs training: ", carry)
-
-    # Plot the results
-    print("\nShape of xe: ", xe.shape)
-    print("Shape of obs: ", obs.shape)
-
-    print("\nA Matrix: ", params['params']['basicPLRNNCell_0']['A']['kernel'])
+    print("A Matrix: ", params['params']['basicPLRNNCell_0']['A']['kernel'])
     print("\nB Matrix: ", params['params']['basicPLRNNCell_0']['B']['kernel'])
     print("\nW Matrix: ", params['params']['basicPLRNNCell_0']['W']['kernel'])
 
+    # Plot the results
     xe = np.array(xe)[0]
     obs = np.array(obs)[0]
+
+    print("\nShape of xe: ", xe.shape)
+    print("Shape of obs: ", obs.shape)
 
     ax1 = plt.subplot(311)
     ax1.plot(obs[:, 0], color='C0')
