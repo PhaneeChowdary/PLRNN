@@ -7,7 +7,7 @@ from jax import numpy as jnp
 from flax import linen as nn
 from functools import partial
 from matplotlib import pyplot as plt
-from basicPLRNNCell import basicPLRNNCell
+from PLRNN import basicPLRNNCell
 
 
 # Rossler dynamical system, used for generating synthetic data.
@@ -37,22 +37,25 @@ class Net(nn.Module):
     num_neurons: int
 
     @nn.compact
-    def __call__(self, carry, s):
-        plrnn = basicPLRNNCell(self.latent_size, self.num_neurons)
-        carry, outputs = plrnn(carry, s)
-        return carry, outputs
+    def __call__(self, s):
+        plrnn = basicPLRNNCell(self.latent_size)
+        latentModel = nn.RNN(plrnn, return_carry=False, name="LatentModel")
+        obsModel = nn.Dense(self.num_neurons, use_bias=False, name="ObsModel")
+        z = latentModel(s)
+        x = obsModel(z)
+        print(z.shape, x.shape, s.shape)
+        return x
 
 
 # Loss function that computes MSE
 @jax.jit
-def compute_loss_(params, carry, s, obs):
-    _, x = model.apply(params, carry, s)
+def compute_loss_(params, s, obs):
+    x = model.apply(params, s)
     error = obs - x
     e2 = error * error
     return jnp.mean(e2)
 
 
-# Reset the diagonal elements of W to Zero
 def reset_W_diagonal(params):
     W = params['params']['basicPLRNNCell_0']['W']['kernel']
     W = W.at[jnp.diag_indices(W.shape[0])].set(0)
@@ -79,54 +82,52 @@ if __name__ == '__main__':
     # Neural network setup
     model = Net(dz, my_dims)
 
-    # Initialize carry
-    plrnn_cell = basicPLRNNCell(dz, my_dims)
-    carry = plrnn_cell.initialize_carry(random.PRNGKey(1234))
-
     # Initialize model parameters
     key, skey = random.split(random.PRNGKey(1234), 2)
-    params = model.init(skey, carry, s)
-    x = model.apply(params, carry, s)
+    params = model.init(skey, s)
+    x = model.apply(params, s)
 
     # Loss function and optimizer
-    compute_loss = partial(compute_loss_, obs=jnp.array(obs))
+    compute_loss = partial(compute_loss_, s=jnp.array(s), obs=jnp.array(obs))
     loss_grad = jax.grad(compute_loss)
-    optimizer = optax.adamw(learning_rate=1e-3)
+    optimizer = optax.chain(optax.clip(0.2), optax.adamw(learning_rate=1e-3,))
     opt_state = optimizer.init(params)
+
+    print("Initial Parameters:", params)
+
+    # # Before training, the initial loss and gradients
+    # initial_loss = compute_loss(params)
+    # initial_grads = loss_grad(params)
+    # initial_grads = jax.tree_map(
+    #     lambda x: jnp.nan_to_num(x, nan=0.0), initial_grads)
+    # print("Initial Loss:", initial_loss)
+    # print("Initial Gradients:", initial_grads)
+    # print(params)
 
     # Training loop
     for epoch in range(10):
-        # print("Epoch: ", epoch)
-        grads = loss_grad(params, carry, s)
+        grads = loss_grad(params)
         updates, opt_state = optimizer.update(grads, opt_state, params)
         params = optax.apply_updates(params, updates)
-        # Reset the diagonal elements of W to zero
         params = reset_W_diagonal(params)
+        # Check in which iterarion we are getting NaN values?
+        # print("Epoch ", epoch, params)
 
-    carry, predicted = model.apply(params, carry, s)
-    carry = carry[0][0]
+    predicted = model.apply(params, s)
+    # print(params)
 
     # Further training
-    for epoch in range(1000):
-        # print("Epoch: ", epoch)
-        grads = loss_grad(params, carry, s)
+    for epoch in range(100):
+        grads = loss_grad(params)
         updates, opt_state = optimizer.update(grads, opt_state, params)
         params = optax.apply_updates(params, updates)
-        # Reset the diagonal elements of W to zero
         params = reset_W_diagonal(params)
 
-    carry, xe = model.apply(params, carry, s)
+    xe = model.apply(params, s)
 
-    print("A Matrix: ", params['params']['basicPLRNNCell_0']['A']['kernel'])
-    print("\nB Matrix: ", params['params']['basicPLRNNCell_0']['B']['kernel'])
-    print("\nW Matrix: ", params['params']['basicPLRNNCell_0']['W']['kernel'])
-
-    # Plot the results
+    # plot
     xe = np.array(xe)[0]
     obs = np.array(obs)[0]
-
-    print("\nShape of xe: ", xe.shape)
-    print("Shape of obs: ", obs.shape)
 
     ax1 = plt.subplot(311)
     ax1.plot(obs[:, 0], color='C0')
@@ -140,5 +141,5 @@ if __name__ == '__main__':
     ax3.plot(obs[:, 2], color='C0')
     ax3.plot(xe[:, 2], '--', color='C1')
 
-    plt.savefig('RNNTrajectory.pdf')
+    plt.savefig('RNNtrajectory.pdf')
     plt.close()
